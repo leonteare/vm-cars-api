@@ -3,37 +3,61 @@ import fs from "fs";
 import path from "path";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-// Allow JSON body for POST requests
 app.use(express.json());
 
-// Path to persistent file
-const carsFile = "/mnt/data/cars.json";
+// Path to cars.json
+const carsFile = path.join(process.cwd(), "cars.json");
 
-// Serve cars.json if it exists
-app.get("/cars.json", (req, res) => {
-  if (fs.existsSync(carsFile)) {
-    res.sendFile(carsFile);
-  } else {
-    res.status(404).json({ error: "cars.json not found" });
+// --- GET cars ---
+app.get("/cars", (req, res) => {
+  try {
+    if (!fs.existsSync(carsFile)) {
+      return res.json([]);
+    }
+    const data = fs.readFileSync(carsFile, "utf8");
+    res.json(JSON.parse(data));
+  } catch (err) {
+    console.error("Error reading cars.json:", err);
+    res.status(500).json({ error: "Failed to read cars.json" });
   }
 });
 
-// Endpoint for n8n to update cars.json
+// --- POST update ---
 app.post("/update", (req, res) => {
   try {
-    fs.writeFileSync(carsFile, JSON.stringify(req.body, null, 2));
-    res.json({ status: "✅ cars.json updated", items: req.body.cms?.length || 0 });
+    // Accept flexible input
+    const body = req.body;
+    let cars = [];
+
+    if (Array.isArray(body)) {
+      cars = body;
+    } else if (Array.isArray(body.cms)) {
+      cars = body.cms;
+    } else if (Array.isArray(body.cars)) {
+      cars = body.cars;
+    } else {
+      return res
+        .status(400)
+        .json({ error: "Invalid format: expected an array, or {cms: []}, or {cars: []}" });
+    }
+
+    fs.writeFileSync(carsFile, JSON.stringify(cars, null, 2));
+
+    res.json({
+      status: "✅ cars.json updated",
+      count: cars.length,
+    });
   } catch (err) {
     console.error("Error writing cars.json:", err);
     res.status(500).json({ error: "Failed to update cars.json" });
   }
 });
 
-// Health check
+// --- Root endpoint ---
 app.get("/", (req, res) => {
-  res.send("✅ Cars API running");
+  res.send("🚗 Cars API is running");
 });
 
 app.listen(PORT, () => {
