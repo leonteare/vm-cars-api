@@ -1,9 +1,9 @@
-// ---------- script-dev.js v4 ----------
-// Smart dropdown syncing + Price slider
+// ---------- script-dev.js v4.1 ----------
+// Smart dropdown syncing + Price slider with labels above thumbs
 
 const API_URL = "https://leonteare.github.io/vm-cars-api/cars.json";
 const PAGE_SIZE = 40;
-const VERSION = "v4";
+const VERSION = "v4.1";
 
 let cars = [];
 let makes = [];
@@ -15,7 +15,7 @@ let makeToFuels = {};
 let fuelToMakes = {};
 
 // Price slider elements
-let minInput, maxInput, priceDisplay;
+let minInput, maxInput, minLabel, maxLabel;
 let globalMinPrice = 0, globalMaxPrice = 100000;
 
 // -------- Helpers --------
@@ -107,30 +107,42 @@ function initPriceRange() {
 
   minInput = document.getElementById("price-min");
   maxInput = document.getElementById("price-max");
-  priceDisplay = document.getElementById("price-display");
+  minLabel = document.getElementById("price-min-label");
+  maxLabel = document.getElementById("price-max-label");
 
-  if (!minInput || !maxInput || !priceDisplay) return;
+  if (!minInput || !maxInput || !minLabel || !maxLabel) return;
 
-  minInput.min = globalMinPrice;
-  minInput.max = globalMaxPrice;
+  [minInput, maxInput].forEach(input => {
+    input.min = globalMinPrice;
+    input.max = globalMaxPrice;
+    input.step = 5000;
+  });
+
   minInput.value = globalMinPrice;
-
-  maxInput.min = globalMinPrice;
-  maxInput.max = globalMaxPrice;
   maxInput.value = globalMaxPrice;
 
-  function updatePriceDisplay() {
+  function updateLabels() {
     let min = parseInt(minInput.value, 10);
     let max = parseInt(maxInput.value, 10);
     if (min > max) [min, max] = [max, min];
-    priceDisplay.textContent = `£${min.toLocaleString()} – £${max.toLocaleString()}`;
+
+    // Position labels above thumbs
+    const rangeWidth = minInput.offsetWidth;
+    const minPercent = ((min - globalMinPrice) / (globalMaxPrice - globalMinPrice)) * 100;
+    const maxPercent = ((max - globalMinPrice) / (globalMaxPrice - globalMinPrice)) * 100;
+
+    minLabel.style.left = `calc(${minPercent}% - 20px)`;
+    maxLabel.style.left = `calc(${maxPercent}% - 20px)`;
+
+    minLabel.textContent = `£${min.toLocaleString()}`;
+    maxLabel.textContent = `£${max.toLocaleString()}`;
   }
 
   [minInput, maxInput].forEach(input =>
-    input.addEventListener("input", updatePriceDisplay)
+    input.addEventListener("input", updateLabels)
   );
 
-  updatePriceDisplay();
+  updateLabels();
 }
 
 // -------- Dropdown population --------
