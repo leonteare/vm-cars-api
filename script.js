@@ -202,3 +202,6 @@ document.getElementById("filter-type").addEventListener("change", applyFilters);
 
 // -------- Init --------
 fetchCars();
+
+console.log("✅ script.js loaded!");
+
