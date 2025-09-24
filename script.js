@@ -73,20 +73,27 @@ function populateDropdowns(selectedMake = "", selectedFuel = "") {
 
   if (!makeSelect || !fuelSelect) return;
 
-  // Determine available options based on current selections
-  let availableCars = cars;
-  if (selectedMake) {
-    availableCars = availableCars.filter(c => (c.makeName || "").toLowerCase() === selectedMake);
-  }
+  // availableMakes = filtered by fuel (if any)
+  let availableMakes = cars;
   if (selectedFuel) {
-    availableCars = availableCars.filter(c => (c.fuelType || "").toLowerCase() === selectedFuel);
+    availableMakes = cars.filter(c => (c.fuelType || "").toLowerCase() === selectedFuel);
   }
 
-  const makeSet = new Set();
-  const fuelSet = new Set();
+  // availableFuels = filtered by make (if any)
+  let availableFuels = cars;
+  if (selectedMake) {
+    availableFuels = cars.filter(c => (c.makeName || "").toLowerCase() === selectedMake);
+  }
 
-  availableCars.forEach(car => {
+  // --- Build make set ---
+  const makeSet = new Set();
+  availableMakes.forEach(car => {
     if (car.makeName) makeSet.add(car.makeName.trim());
+  });
+
+  // --- Build fuel set ---
+  const fuelSet = new Set();
+  availableFuels.forEach(car => {
     if (car.fuelType) fuelSet.add(car.fuelType.trim());
   });
 
@@ -204,4 +211,3 @@ document.getElementById("filter-type").addEventListener("change", applyFilters);
 fetchCars();
 
 console.log("✅ script.js loaded!");
-
