@@ -1,19 +1,20 @@
+// ---------- script-dev.js v3 ----------
+// Smart dropdown syncing (but only filter on Search)
+
 const API_URL = "https://leonteare.github.io/vm-cars-api/cars.json";
 const PAGE_SIZE = 40;
-const VERSION = "v1.3";
+const VERSION = "v3";
 
 let cars = [];
 let makes = [];
 let filteredCars = [];
 let currentIndex = 0;
 
-// Track selected values (updated by dropdowns, applied on Search)
-let selectedMake = "";
-let selectedFuel = "";
+// Lookup maps
+let makeToFuels = {};
+let fuelToMakes = {};
 
 // -------- Helpers --------
-
-// Title Case
 function toTitleCase(str) {
   return str
     .split(" ")
@@ -21,7 +22,6 @@ function toTitleCase(str) {
     .join(" ");
 }
 
-// Format make with exceptions
 function formatMake(str) {
   if (!str) return "";
   const upperCaseMakes = ["bmw", "fiat", "dfsk"];
@@ -30,7 +30,6 @@ function formatMake(str) {
   return toTitleCase(str);
 }
 
-// Format fuel
 function formatFuelType(str) {
   if (!str) return "";
   const acronyms = ["phev", "hev", "ev", "bev", "lpg", "cng"];
@@ -53,7 +52,7 @@ async function fetchCars() {
     cars = data.cars || [];
     makes = data.makes || [];
 
-    // Attach makeName by cross-referencing makes array
+    // Attach makeName
     cars = cars.map(car => {
       const foundMake = makes.find(m => m.id === car.make);
       return {
@@ -64,83 +63,80 @@ async function fetchCars() {
 
     filteredCars = [...cars];
 
-    populateDropdowns(); // all options
+    buildLookupMaps();
+    populateDropdowns(); // initial all options
     renderCars();
-    console.log(`✅ script.js ${VERSION} loaded! Cars: ${cars.length}`);
+
+    console.log(`✅ script-dev.js ${VERSION} loaded! Cars: ${cars.length}, Makes: ${makes.length}`);
   } catch (err) {
     console.error("❌ Failed to fetch cars:", err);
   }
 }
 
+// -------- Lookup maps --------
+function buildLookupMaps() {
+  makeToFuels = {};
+  fuelToMakes = {};
+
+  cars.forEach(car => {
+    const make = (car.makeName || "").toLowerCase();
+    const fuel = (car.fuelType || "").toLowerCase();
+
+    if (!make || !fuel) return;
+
+    if (!makeToFuels[make]) makeToFuels[make] = new Set();
+    if (!fuelToMakes[fuel]) fuelToMakes[fuel] = new Set();
+
+    makeToFuels[make].add(fuel);
+    fuelToMakes[fuel].add(make);
+  });
+}
+
 // -------- Dropdown population --------
-function populateDropdowns(makeVal = "", fuelVal = "") {
+function populateDropdowns(selectedMake = "", selectedFuel = "") {
   const makeSelect = document.getElementById("filter-make");
   const fuelSelect = document.getElementById("filter-type");
+
   if (!makeSelect || !fuelSelect) return;
 
-  // Base dataset: all cars (no filters applied yet)
-  let availableCars = [...cars];
+  let makesList = new Set(makes.map(m => formatMake(m.name)));
+  let fuelsList = new Set(cars.map(c => c.fuelType).filter(Boolean));
 
-  // Restrict based on currently selected filters
-  if (makeVal) {
-    availableCars = availableCars.filter(c => (c.makeName || "").toLowerCase() === makeVal);
-  }
-  if (fuelVal) {
-    availableCars = availableCars.filter(c => (c.fuelType || "").toLowerCase() === fuelVal);
+  if (selectedMake && makeToFuels[selectedMake]) {
+    fuelsList = makeToFuels[selectedMake];
   }
 
-  const makeSet = new Set();
-  const fuelSet = new Set();
+  if (selectedFuel && fuelToMakes[selectedFuel]) {
+    makesList = fuelToMakes[selectedFuel];
+  }
 
-  availableCars.forEach(car => {
-    if (car.makeName) makeSet.add(car.makeName.trim());
-    if (car.fuelType) fuelSet.add(car.fuelType.trim());
-  });
-
-  // --- Populate Makes ---
+  // Repopulate makes
   makeSelect.innerHTML = '<option value="">All</option>';
-  [...makeSet].sort((a, b) => a.localeCompare(b)).forEach(make => {
+  [...makesList].sort((a, b) => a.localeCompare(b)).forEach(make => {
     const opt = document.createElement("option");
     opt.value = make.toLowerCase();
     opt.textContent = formatMake(make);
-    if (make.toLowerCase() === makeVal) opt.selected = true;
+    if (make.toLowerCase() === selectedMake) opt.selected = true;
     makeSelect.appendChild(opt);
   });
 
-  // --- Populate Fuels ---
+  // Repopulate fuels
   fuelSelect.innerHTML = '<option value="">All</option>';
-  [...fuelSet].sort((a, b) => a.localeCompare(b)).forEach(fuel => {
+  [...fuelsList].sort((a, b) => a.localeCompare(b)).forEach(fuel => {
     const opt = document.createElement("option");
     opt.value = fuel.toLowerCase();
     opt.textContent = formatFuelType(fuel);
-    if (fuel.toLowerCase() === fuelVal) opt.selected = true;
+    if (fuel.toLowerCase() === selectedFuel) opt.selected = true;
     fuelSelect.appendChild(opt);
   });
 }
 
 // -------- Apply filters --------
 function applyFilters() {
-  let make = selectedMake || "";
-  let fuel = selectedFuel || "";
+  const make = document.getElementById("filter-make").value || "";
+  const fuel = document.getElementById("filter-type").value || "";
   const priceRange = document.getElementById("filter-budget").value.trim();
 
-  // Validate combo → if invalid, reset the clashing filter
-  const validCombo = cars.some(car => {
-    const carMake = (car.makeName || "").toLowerCase();
-    const carFuel = (car.fuelType || "").toLowerCase();
-    return (!make || carMake === make) && (!fuel || carFuel === fuel);
-  });
-
-  if (!validCombo) {
-    console.warn("⚠️ Invalid make/fuel combo. Resetting one filter.");
-    if (make && fuel) {
-      // Reset fuel by default
-      fuel = "";
-      selectedFuel = "";
-    }
-  }
-
-  // Price parsing
   let minPrice = 0, maxPrice = Infinity;
   if (priceRange.includes("-")) {
     const [min, max] = priceRange.split("-").map(v => parseInt(v.replace(/,/g, ""), 10));
@@ -150,7 +146,6 @@ function applyFilters() {
     maxPrice = parseInt(priceRange.replace(/,/g, ""), 10);
   }
 
-  // Filter cars
   filteredCars = cars.filter(car => {
     let match = true;
     const carMake = (car.makeName || "").toLowerCase();
@@ -162,11 +157,12 @@ function applyFilters() {
     return match;
   });
 
-  // Reset grid + repopulate dropdowns
+  // Reset grid
   currentIndex = 0;
   document.getElementById("car-holder").innerHTML = "";
   renderCars();
-  populateDropdowns(make, fuel);
+
+  console.log(`🔎 Search applied — Make: ${make || "All"}, Fuel: ${fuel || "All"}, Cars: ${filteredCars.length}`);
 }
 
 // -------- Render cars --------
@@ -215,17 +211,19 @@ window.addEventListener("scroll", () => {
 });
 
 // -------- Hook up events --------
+document.getElementById("filter-make").addEventListener("change", e => {
+  const selectedMake = e.target.value;
+  populateDropdowns(selectedMake, document.getElementById("filter-type").value);
+});
+
+document.getElementById("filter-type").addEventListener("change", e => {
+  const selectedFuel = e.target.value;
+  populateDropdowns(document.getElementById("filter-make").value, selectedFuel);
+});
+
 document.getElementById("filter-button").addEventListener("click", e => {
   e.preventDefault();
   applyFilters();
-});
-
-// Just update stored values on dropdown change
-document.getElementById("filter-make").addEventListener("change", e => {
-  selectedMake = e.target.value;
-});
-document.getElementById("filter-type").addEventListener("change", e => {
-  selectedFuel = e.target.value;
 });
 
 // -------- Init --------
