@@ -211,7 +211,7 @@ function applyFilters() {
 
   console.log(`🔎 Search applied — Make: ${make || "All"}, Fuel: ${fuel || "All"}, Price: £${minPrice}–£${maxPrice}, Cars: ${filteredCars.length}`);
 }
-
+ 
 // -------- Render cars --------
 function renderCars() {
   if (currentIndex >= filteredCars.length) return;
