@@ -1,9 +1,9 @@
-// ---------- script-dev.js v3 ----------
-// Smart dropdown syncing (but only filter on Search)
+// ---------- script-dev.js v4 ----------
+// Smart dropdown syncing + Price slider
 
 const API_URL = "https://leonteare.github.io/vm-cars-api/cars.json";
 const PAGE_SIZE = 40;
-const VERSION = "v3";
+const VERSION = "v4";
 
 let cars = [];
 let makes = [];
@@ -13,6 +13,10 @@ let currentIndex = 0;
 // Lookup maps
 let makeToFuels = {};
 let fuelToMakes = {};
+
+// Price slider elements
+let minInput, maxInput, priceDisplay;
+let globalMinPrice = 0, globalMaxPrice = 100000;
 
 // -------- Helpers --------
 function toTitleCase(str) {
@@ -64,6 +68,7 @@ async function fetchCars() {
     filteredCars = [...cars];
 
     buildLookupMaps();
+    initPriceRange();
     populateDropdowns(); // initial all options
     renderCars();
 
@@ -90,6 +95,42 @@ function buildLookupMaps() {
     makeToFuels[make].add(fuel);
     fuelToMakes[fuel].add(make);
   });
+}
+
+// -------- Price slider --------
+function initPriceRange() {
+  const prices = cars.map(c => c.price).filter(Boolean);
+  if (!prices.length) return;
+
+  globalMinPrice = Math.floor(Math.min(...prices) / 5000) * 5000;
+  globalMaxPrice = Math.ceil(Math.max(...prices) / 5000) * 5000;
+
+  minInput = document.getElementById("price-min");
+  maxInput = document.getElementById("price-max");
+  priceDisplay = document.getElementById("price-display");
+
+  if (!minInput || !maxInput || !priceDisplay) return;
+
+  minInput.min = globalMinPrice;
+  minInput.max = globalMaxPrice;
+  minInput.value = globalMinPrice;
+
+  maxInput.min = globalMinPrice;
+  maxInput.max = globalMaxPrice;
+  maxInput.value = globalMaxPrice;
+
+  function updatePriceDisplay() {
+    let min = parseInt(minInput.value, 10);
+    let max = parseInt(maxInput.value, 10);
+    if (min > max) [min, max] = [max, min];
+    priceDisplay.textContent = `£${min.toLocaleString()} – £${max.toLocaleString()}`;
+  }
+
+  [minInput, maxInput].forEach(input =>
+    input.addEventListener("input", updatePriceDisplay)
+  );
+
+  updatePriceDisplay();
 }
 
 // -------- Dropdown population --------
@@ -135,16 +176,10 @@ function populateDropdowns(selectedMake = "", selectedFuel = "") {
 function applyFilters() {
   const make = document.getElementById("filter-make").value || "";
   const fuel = document.getElementById("filter-type").value || "";
-  const priceRange = document.getElementById("filter-budget").value.trim();
 
-  let minPrice = 0, maxPrice = Infinity;
-  if (priceRange.includes("-")) {
-    const [min, max] = priceRange.split("-").map(v => parseInt(v.replace(/,/g, ""), 10));
-    if (!isNaN(min)) minPrice = min;
-    if (!isNaN(max)) maxPrice = max;
-  } else if (priceRange) {
-    maxPrice = parseInt(priceRange.replace(/,/g, ""), 10);
-  }
+  let minPrice = parseInt(minInput?.value || globalMinPrice, 10);
+  let maxPrice = parseInt(maxInput?.value || globalMaxPrice, 10);
+  if (minPrice > maxPrice) [minPrice, maxPrice] = [maxPrice, minPrice];
 
   filteredCars = cars.filter(car => {
     let match = true;
@@ -162,7 +197,7 @@ function applyFilters() {
   document.getElementById("car-holder").innerHTML = "";
   renderCars();
 
-  console.log(`🔎 Search applied — Make: ${make || "All"}, Fuel: ${fuel || "All"}, Cars: ${filteredCars.length}`);
+  console.log(`🔎 Search applied — Make: ${make || "All"}, Fuel: ${fuel || "All"}, Price: £${minPrice}–£${maxPrice}, Cars: ${filteredCars.length}`);
 }
 
 // -------- Render cars --------
