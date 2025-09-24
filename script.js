@@ -1,3 +1,6 @@
+const VERSION = "v1.1.0"; // 🔄 bump this when you deploy
+console.log(`✅ script.js loaded! Version: ${VERSION}`);
+
 const API_URL = "https://leonteare.github.io/vm-cars-api/cars.json";
 const PAGE_SIZE = 40;
 
@@ -73,49 +76,43 @@ function populateDropdowns(selectedMake = "", selectedFuel = "") {
 
   if (!makeSelect || !fuelSelect) return;
 
-  // availableMakes = filtered by fuel (if any)
-  let availableMakes = cars;
-  if (selectedFuel) {
-    availableMakes = cars.filter(c => (c.fuelType || "").toLowerCase() === selectedFuel);
-  }
+  // --- Build ALL makes (always keep full list) ---
+  const allMakes = Array.from(
+    new Set(cars.map(c => c.makeName).filter(Boolean))
+  );
 
-  // availableFuels = filtered by make (if any)
+  // --- Build fuels depending on selectedMake ---
   let availableFuels = cars;
   if (selectedMake) {
-    availableFuels = cars.filter(c => (c.makeName || "").toLowerCase() === selectedMake);
+    availableFuels = cars.filter(
+      c => (c.makeName || "").toLowerCase() === selectedMake
+    );
   }
+  const fuelSet = new Set(availableFuels.map(c => c.fuelType).filter(Boolean));
 
-  // --- Build make set ---
-  const makeSet = new Set();
-  availableMakes.forEach(car => {
-    if (car.makeName) makeSet.add(car.makeName.trim());
-  });
-
-  // --- Build fuel set ---
-  const fuelSet = new Set();
-  availableFuels.forEach(car => {
-    if (car.fuelType) fuelSet.add(car.fuelType.trim());
-  });
-
-  // --- Populate Makes ---
+  // --- Populate Makes (always all) ---
   makeSelect.innerHTML = '<option value="">All</option>';
-  [...makeSet].sort((a, b) => a.localeCompare(b)).forEach(make => {
-    const opt = document.createElement("option");
-    opt.value = make.toLowerCase();
-    opt.textContent = formatMake(make);
-    if (make.toLowerCase() === selectedMake) opt.selected = true;
-    makeSelect.appendChild(opt);
-  });
+  allMakes
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(make => {
+      const opt = document.createElement("option");
+      opt.value = make.toLowerCase();
+      opt.textContent = formatMake(make);
+      if (make.toLowerCase() === selectedMake) opt.selected = true;
+      makeSelect.appendChild(opt);
+    });
 
-  // --- Populate Fuels ---
+  // --- Populate Fuels (conditional) ---
   fuelSelect.innerHTML = '<option value="">All</option>';
-  [...fuelSet].sort((a, b) => a.localeCompare(b)).forEach(fuel => {
-    const opt = document.createElement("option");
-    opt.value = fuel.toLowerCase();
-    opt.textContent = formatFuelType(fuel);
-    if (fuel.toLowerCase() === selectedFuel) opt.selected = true;
-    fuelSelect.appendChild(opt);
-  });
+  [...fuelSet]
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(fuel => {
+      const opt = document.createElement("option");
+      opt.value = fuel.toLowerCase();
+      opt.textContent = formatFuelType(fuel);
+      if (fuel.toLowerCase() === selectedFuel) opt.selected = true;
+      fuelSelect.appendChild(opt);
+    });
 }
 
 // -------- Apply filters --------
@@ -124,9 +121,12 @@ function applyFilters() {
   const fuel = document.getElementById("filter-type").value || "";
   const priceRange = document.getElementById("filter-budget").value.trim();
 
-  let minPrice = 0, maxPrice = Infinity;
+  let minPrice = 0,
+    maxPrice = Infinity;
   if (priceRange.includes("-")) {
-    const [min, max] = priceRange.split("-").map(v => parseInt(v.replace(/,/g, ""), 10));
+    const [min, max] = priceRange
+      .split("-")
+      .map(v => parseInt(v.replace(/,/g, ""), 10));
     if (!isNaN(min)) minPrice = min;
     if (!isNaN(max)) maxPrice = max;
   } else if (priceRange) {
@@ -140,16 +140,23 @@ function applyFilters() {
 
     if (make && carMake !== make) match = false;
     if (fuel && carFuel !== fuel) match = false;
-    if (car.price && (car.price < minPrice || car.price > maxPrice)) match = false;
+    if (car.price && (car.price < minPrice || car.price > maxPrice))
+      match = false;
     return match;
   });
+
+  console.log(
+    `🔍 Filters applied → Make: ${make || "All"}, Fuel: ${
+      fuel || "All"
+    }, Matches: ${filteredCars.length}`
+  );
 
   // Reset grid
   currentIndex = 0;
   document.getElementById("car-holder").innerHTML = "";
   renderCars();
 
-  // 🔄 Re-populate dropdowns based on narrowed dataset
+  // 🔄 Re-populate dropdowns but keep full makes
   populateDropdowns(make, fuel);
 }
 
@@ -166,12 +173,18 @@ function renderCars() {
       <div class="relative">
         <div class="new-car-image">
           <div class="height-full">
-            <div class="new-car-image-bg" style="background-image:url('${car.image || ""}')"></div>
+            <div class="new-car-image-bg" style="background-image:url('${
+              car.image || ""
+            }')"></div>
           </div>
         </div>
         <div class="absolute-full padding-left-2 padding-top-1">
           ${car.transmission ? `<p class="pill">${car.transmission}</p>` : ""}
-          ${car.fuelType ? `<p class="pill">${formatFuelType(car.fuelType)}</p>` : ""}
+          ${
+            car.fuelType
+              ? `<p class="pill">${formatFuelType(car.fuelType)}</p>`
+              : ""
+          }
         </div>
       </div>
       <div class="new-car-bottom-bg">
@@ -180,7 +193,11 @@ function renderCars() {
             <p class="new-car-title margin-bottom-0">${car.name || ""}</p>
           </div>
           <p class="new-car-price margin-left-4 margin-bottom-0">
-            ${car.price ? "£" + Number(car.price).toLocaleString("en-GB") : ""}
+            ${
+              car.price
+                ? "£" + Number(car.price).toLocaleString("en-GB")
+                : ""
+            }
           </p>
         </div>
       </div>
@@ -193,21 +210,28 @@ function renderCars() {
 
 // -------- Infinite scroll --------
 window.addEventListener("scroll", () => {
-  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+  if (
+    window.innerHeight + window.scrollY >=
+    document.body.offsetHeight - 200
+  ) {
     renderCars();
   }
 });
 
 // -------- Hook up events --------
-document.getElementById("filter-button").addEventListener("click", e => {
-  e.preventDefault();
-  applyFilters();
-});
+document
+  .getElementById("filter-button")
+  .addEventListener("click", e => {
+    e.preventDefault();
+    applyFilters();
+  });
 
-document.getElementById("filter-make").addEventListener("change", applyFilters);
-document.getElementById("filter-type").addEventListener("change", applyFilters);
+document
+  .getElementById("filter-make")
+  .addEventListener("change", applyFilters);
+document
+  .getElementById("filter-type")
+  .addEventListener("change", applyFilters);
 
 // -------- Init --------
 fetchCars();
-
-console.log("✅ script.js loaded!");
