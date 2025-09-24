@@ -1,9 +1,9 @@
-// ---------- script-dev.js v4.2 ----------
-// Smart dropdown syncing + Price slider with prices inside thumbs
+// ---------- script-dev.js v4.3 ----------
+// Smart dropdown syncing + Price slider with values inside thumbs
 
 const API_URL = "https://leonteare.github.io/vm-cars-api/cars.json";
 const PAGE_SIZE = 40;
-const VERSION = "v4.5";
+const VERSION = "v4.3";
 
 let cars = [];
 let makes = [];
@@ -14,10 +14,10 @@ let currentIndex = 0;
 let makeToFuels = {};
 let fuelToMakes = {};
 
-// Price slider elements
+// Price slider
 let minInput, maxInput, track;
 let globalMinPrice = 0, globalMaxPrice = 100000;
-const MIN_GAP = 5000; // gap between thumbs
+const MIN_GAP = 5000;
 
 // -------- Helpers --------
 function toTitleCase(str) {
@@ -57,7 +57,6 @@ async function fetchCars() {
     cars = data.cars || [];
     makes = data.makes || [];
 
-    // Attach makeName
     cars = cars.map(car => {
       const foundMake = makes.find(m => m.id === car.make);
       return {
@@ -70,12 +69,10 @@ async function fetchCars() {
 
     buildLookupMaps();
     initPriceRange();
-    populateDropdowns(); // initial all options
+    populateDropdowns();
     renderCars();
 
-    console.log(
-      `✅ script-dev.js ${VERSION} loaded! Cars: ${cars.length}, Makes: ${makes.length}`
-    );
+    console.log(`✅ script-dev.js ${VERSION} loaded! Cars: ${cars.length}, Makes: ${makes.length}`);
   } catch (err) {
     console.error("❌ Failed to fetch cars:", err);
   }
@@ -89,12 +86,9 @@ function buildLookupMaps() {
   cars.forEach(car => {
     const make = (car.makeName || "").toLowerCase();
     const fuel = (car.fuelType || "").toLowerCase();
-
     if (!make || !fuel) return;
-
     if (!makeToFuels[make]) makeToFuels[make] = new Set();
     if (!fuelToMakes[fuel]) fuelToMakes[fuel] = new Set();
-
     makeToFuels[make].add(fuel);
     fuelToMakes[fuel].add(make);
   });
@@ -117,7 +111,7 @@ function initPriceRange() {
   [minInput, maxInput].forEach(input => {
     input.min = globalMinPrice;
     input.max = globalMaxPrice;
-    input.step = 5000;
+    input.step = MIN_GAP;
   });
 
   minInput.value = globalMinPrice;
@@ -127,7 +121,6 @@ function initPriceRange() {
     let min = parseInt(minInput.value, 10);
     let max = parseInt(maxInput.value, 10);
 
-    // Ensure gap
     if (max - min < MIN_GAP) {
       if (e?.target === minInput) {
         min = max - MIN_GAP;
@@ -142,13 +135,12 @@ function initPriceRange() {
     const minPercent = ((min - globalMinPrice) / range) * 100;
     const maxPercent = ((max - globalMinPrice) / range) * 100;
 
-    // Update thumb labels (via dataset)
-    minInput.setAttribute("data-value", `£${min.toLocaleString()}`);
-    maxInput.setAttribute("data-value", `£${max.toLocaleString()}`);
-
-    // Update track fill
     track.style.left = `${minPercent}%`;
     track.style.width = `${maxPercent - minPercent}%`;
+
+    // Inject values into thumbs
+    minInput.style.setProperty("--val", `"£${min.toLocaleString()}"`);
+    maxInput.style.setProperty("--val", `"£${max.toLocaleString()}"`);
   }
 
   [minInput, maxInput].forEach(input =>
@@ -162,7 +154,6 @@ function initPriceRange() {
 function populateDropdowns(selectedMake = "", selectedFuel = "") {
   const makeSelect = document.getElementById("filter-make");
   const fuelSelect = document.getElementById("filter-type");
-
   if (!makeSelect || !fuelSelect) return;
 
   let makesList = new Set(makes.map(m => formatMake(m.name)));
@@ -171,12 +162,10 @@ function populateDropdowns(selectedMake = "", selectedFuel = "") {
   if (selectedMake && makeToFuels[selectedMake]) {
     fuelsList = makeToFuels[selectedMake];
   }
-
   if (selectedFuel && fuelToMakes[selectedFuel]) {
     makesList = fuelToMakes[selectedFuel];
   }
 
-  // Repopulate makes
   makeSelect.innerHTML = '<option value="">All</option>';
   [...makesList].sort((a, b) => a.localeCompare(b)).forEach(make => {
     const opt = document.createElement("option");
@@ -186,7 +175,6 @@ function populateDropdowns(selectedMake = "", selectedFuel = "") {
     makeSelect.appendChild(opt);
   });
 
-  // Repopulate fuels
   fuelSelect.innerHTML = '<option value="">All</option>';
   [...fuelsList].sort((a, b) => a.localeCompare(b)).forEach(fuel => {
     const opt = document.createElement("option");
@@ -210,21 +198,17 @@ function applyFilters() {
     let match = true;
     const carMake = (car.makeName || "").toLowerCase();
     const carFuel = (car.fuelType || "").toLowerCase();
-
     if (make && carMake !== make) match = false;
     if (fuel && carFuel !== fuel) match = false;
     if (car.price && (car.price < minPrice || car.price > maxPrice)) match = false;
     return match;
   });
 
-  // Reset grid
   currentIndex = 0;
   document.getElementById("car-holder").innerHTML = "";
   renderCars();
 
-  console.log(
-    `🔎 Search applied — Make: ${make || "All"}, Fuel: ${fuel || "All"}, Price: £${minPrice}–£${maxPrice}, Cars: ${filteredCars.length}`
-  );
+  console.log(`🔎 Search applied — Make: ${make || "All"}, Fuel: ${fuel || "All"}, Price: £${minPrice}–£${maxPrice}, Cars: ${filteredCars.length}`);
 }
 
 // -------- Render cars --------
@@ -277,12 +261,10 @@ document.getElementById("filter-make").addEventListener("change", e => {
   const selectedMake = e.target.value;
   populateDropdowns(selectedMake, document.getElementById("filter-type").value);
 });
-
 document.getElementById("filter-type").addEventListener("change", e => {
   const selectedFuel = e.target.value;
   populateDropdowns(document.getElementById("filter-make").value, selectedFuel);
 });
-
 document.getElementById("filter-button").addEventListener("click", e => {
   e.preventDefault();
   applyFilters();
