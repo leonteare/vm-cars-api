@@ -1,4 +1,3 @@
-<script>
 const API_URL = "https://leonteare.github.io/vm-cars-api/cars.json";
 const PAGE_SIZE = 40;
 
@@ -203,4 +202,3 @@ document.getElementById("filter-type").addEventListener("change", applyFilters);
 
 // -------- Init --------
 fetchCars();
-</script>
