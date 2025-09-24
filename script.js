@@ -1,9 +1,9 @@
-// ---------- script-dev.js v4.1 ----------
-// Smart dropdown syncing + Price slider with labels above thumbs
+// ---------- script-dev.js v4.2 ----------
+// Smart dropdown syncing + Price slider with labels & track highlight
 
 const API_URL = "https://leonteare.github.io/vm-cars-api/cars.json";
 const PAGE_SIZE = 40;
-const VERSION = "v4.1";
+const VERSION = "v4.2";
 
 let cars = [];
 let makes = [];
@@ -15,8 +15,9 @@ let makeToFuels = {};
 let fuelToMakes = {};
 
 // Price slider elements
-let minInput, maxInput, minLabel, maxLabel;
+let minInput, maxInput, minLabel, maxLabel, track;
 let globalMinPrice = 0, globalMaxPrice = 100000;
+const MIN_GAP = 5000;
 
 // -------- Helpers --------
 function toTitleCase(str) {
@@ -69,7 +70,7 @@ async function fetchCars() {
 
     buildLookupMaps();
     initPriceRange();
-    populateDropdowns(); // initial all options
+    populateDropdowns();
     renderCars();
 
     console.log(`✅ script-dev.js ${VERSION} loaded! Cars: ${cars.length}, Makes: ${makes.length}`);
@@ -109,8 +110,9 @@ function initPriceRange() {
   maxInput = document.getElementById("price-max");
   minLabel = document.getElementById("price-min-label");
   maxLabel = document.getElementById("price-max-label");
+  track = document.querySelector(".slider-track");
 
-  if (!minInput || !maxInput || !minLabel || !maxLabel) return;
+  if (!minInput || !maxInput || !minLabel || !maxLabel || !track) return;
 
   [minInput, maxInput].forEach(input => {
     input.min = globalMinPrice;
@@ -121,28 +123,42 @@ function initPriceRange() {
   minInput.value = globalMinPrice;
   maxInput.value = globalMaxPrice;
 
-  function updateLabels() {
+  function updateSlider() {
     let min = parseInt(minInput.value, 10);
     let max = parseInt(maxInput.value, 10);
-    if (min > max) [min, max] = [max, min];
+
+    // Ensure min thumb stays below max thumb with gap
+    if (max - min < MIN_GAP) {
+      if (event?.target === minInput) {
+        min = max - MIN_GAP;
+        minInput.value = min;
+      } else {
+        max = min + MIN_GAP;
+        maxInput.value = max;
+      }
+    }
+
+    const range = globalMaxPrice - globalMinPrice;
+    const minPercent = ((min - globalMinPrice) / range) * 100;
+    const maxPercent = ((max - globalMinPrice) / range) * 100;
 
     // Position labels above thumbs
-    const rangeWidth = minInput.offsetWidth;
-    const minPercent = ((min - globalMinPrice) / (globalMaxPrice - globalMinPrice)) * 100;
-    const maxPercent = ((max - globalMinPrice) / (globalMaxPrice - globalMinPrice)) * 100;
-
-    minLabel.style.left = `calc(${minPercent}% - 20px)`;
-    maxLabel.style.left = `calc(${maxPercent}% - 20px)`;
+    minLabel.style.left = `${minPercent}%`;
+    maxLabel.style.left = `${maxPercent}%`;
 
     minLabel.textContent = `£${min.toLocaleString()}`;
     maxLabel.textContent = `£${max.toLocaleString()}`;
+
+    // Update track fill
+    track.style.left = `${minPercent}%`;
+    track.style.width = `${maxPercent - minPercent}%`;
   }
 
   [minInput, maxInput].forEach(input =>
-    input.addEventListener("input", updateLabels)
+    input.addEventListener("input", updateSlider)
   );
 
-  updateLabels();
+  updateSlider();
 }
 
 // -------- Dropdown population --------
@@ -191,7 +207,6 @@ function applyFilters() {
 
   let minPrice = parseInt(minInput?.value || globalMinPrice, 10);
   let maxPrice = parseInt(maxInput?.value || globalMaxPrice, 10);
-  if (minPrice > maxPrice) [minPrice, maxPrice] = [maxPrice, minPrice];
 
   filteredCars = cars.filter(car => {
     let match = true;
@@ -211,7 +226,7 @@ function applyFilters() {
 
   console.log(`🔎 Search applied — Make: ${make || "All"}, Fuel: ${fuel || "All"}, Price: £${minPrice}–£${maxPrice}, Cars: ${filteredCars.length}`);
 }
- 
+
 // -------- Render cars --------
 function renderCars() {
   if (currentIndex >= filteredCars.length) return;
